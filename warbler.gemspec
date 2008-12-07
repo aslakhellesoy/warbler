@@ -10,7 +10,7 @@ Gem::Specification.new do |s|
   s.email = %q{nick@nicksieger.com}
   s.executables = ["warble"]
   s.extra_rdoc_files = ["History.txt", "Manifest.txt", "README.txt", "LICENSES.txt"]
-  s.files = ["History.txt", "Manifest.txt", "README.txt", "LICENSES.txt", "Rakefile", "web.xml.erb", "bin/warble", "generators/warble", "generators/warble/templates", "generators/warble/templates/warble.rb", "generators/warble/warble_generator.rb", "lib/jruby-complete-1.1.4.jar", "lib/jruby-rack-0.9.2.jar", "lib/warbler", "lib/warbler/config.rb", "lib/warbler/gems.rb", "lib/warbler/task.rb", "lib/warbler/version.rb", "lib/warbler.rb", "spec/spec_helper.rb", "spec/warbler/config_spec.rb", "spec/warbler/gems_spec.rb", "spec/warbler/task_spec.rb", "tasks/warbler.rake"]
+  s.files = ["History.txt", "Manifest.txt", "README.txt", "LICENSES.txt", "Rakefile", "web.xml.erb", "bin/warble", "generators/warble", "generators/warble/templates", "generators/warble/templates/warble.rb", "generators/warble/warble_generator.rb", "lib/jruby-rack-0.9.2.jar", "lib/warbler", "lib/warbler/config.rb", "lib/warbler/gems.rb", "lib/warbler/task.rb", "lib/warbler/version.rb", "lib/warbler.rb", "spec/spec_helper.rb", "spec/warbler/config_spec.rb", "spec/warbler/gems_spec.rb", "spec/warbler/task_spec.rb", "tasks/warbler.rake"]
   s.has_rdoc = true
   s.homepage = %q{http://caldersphere.rubyforge.org/warbler}
   s.rdoc_options = ["--main", "README.txt"]

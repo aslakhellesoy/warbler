@@ -91,11 +91,13 @@ module Warbler
     attr_accessor :webxml
 
     def initialize(warbler_home = WARBLER_HOME)
+      jruby_home = ENV["JRUBY_HOME"]
+      puts "JRUBY_HOME = #{jruby_home}"
       @staging_dir = File.join("tmp", "war")
       @dirs        = TOP_DIRS.select {|d| File.directory?(d)}
       @includes    = FileList[]
       @excludes    = FileList[]
-      @java_libs   = FileList["#{warbler_home}/lib/*.jar"]
+      @java_libs   = FileList["#{jruby_home}/lib/jruby.jar","#{warbler_home}/lib/*.jar"]
       @java_classes = FileList[]
       @gems        = Warbler::Gems.new
       @gem_dependencies = true
