@@ -5,6 +5,7 @@
 #++
 
 require 'ostruct'
+require 'rbconfig'
 
 module Warbler
   # Warbler assembly configuration.
@@ -95,7 +96,7 @@ module Warbler
       @dirs        = TOP_DIRS.select {|d| File.directory?(d)}
       @includes    = FileList[]
       @excludes    = FileList[]
-      @java_libs   = FileList["#{warbler_home}/lib/*.jar"]
+      @java_libs   = FileList[jruby_jar,"#{warbler_home}/lib/*.jar"]
       @java_classes = FileList[]
       @gems        = Warbler::Gems.new
       @gem_dependencies = true
@@ -117,6 +118,15 @@ module Warbler
     end
 
     private
+    
+    def jruby_jar
+      jruby_home   = ENV["JRUBY_HOME"]
+      libdir       = jruby_home ? File.join(jruby_home, 'lib') : Config::CONFIG['libdir']
+      jruby_jar    = File.join(libdir, 'jruby.jar')
+      raise "#{jruby_jar} does not exist" unless File.file?(jruby_jar)
+      jruby_jar
+    end
+    
     def warbler_vendor_excludes(warbler_home)
       warbler = File.expand_path(warbler_home)
       if warbler =~ %r{^#{@rails_root}/(.*)}
