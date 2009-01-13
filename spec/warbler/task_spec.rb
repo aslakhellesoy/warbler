@@ -10,29 +10,25 @@ describe Warbler::Task do
   before(:each) do
     @rake = Rake::Application.new
     Rake.application = @rake
-    mkdir_p "public"
+    verbose(false)
+    @pwd = Dir.getwd
+    Dir.chdir("spec/sample")
     mkdir_p "log"
-    touch "public/index.html"
     touch "log/test.log"
     @config = Warbler::Config.new do |config|
-      config.staging_dir = "pkg/tmp/war"
+      config.staging_dir = "tmp/war"
       config.war_name = "warbler"
       config.gems = ["rake"]
-      config.dirs = %w(bin generators log lib)
-      config.public_html = FileList["public/**/*", "tasks/**/*"]
       config.webxml.jruby.max.runtimes = 5
     end
-    verbose(false)
   end
 
   after(:each) do
     define_tasks "clean"
     Rake::Task["warble:clean"].invoke
-    rm_rf "public"
-    rm_rf "config"
     rm_rf "log"
-    rm_f "config.ru"
-    rm_f "web.xml"
+    rm_f FileList["config.ru", "*web.xml", "config/web.xml*", "config/warble.rb"]
+    Dir.chdir(@pwd)
   end
 
   def define_tasks(*tasks)
@@ -63,7 +59,6 @@ describe Warbler::Task do
     define_tasks "public"
     Rake::Task["warble:public"].invoke
     file_list(%r{^#{@config.staging_dir}/index\.html}).should_not be_empty
-    file_list(%r{tasks/warbler\.rake}).should_not be_empty
   end
 
   it "should define a gems task for unpacking gems" do
@@ -178,9 +173,9 @@ describe Warbler::Task do
     end
     define_tasks "app"
     Rake::Task["warble:app"].invoke
-    file_list(%r{WEB-INF/bin/warble$}).should_not be_empty
-    file_list(%r{WEB-INF/generators/warble/warble_generator\.rb$}).should_not be_empty
-    file_list(%r{WEB-INF/lib/warbler\.rb$}).should_not be_empty
+    file_list(%r{WEB-INF/app$}).should_not be_empty
+    file_list(%r{WEB-INF/config$}).should_not be_empty
+    file_list(%r{WEB-INF/lib$}).should_not be_empty
     gems_ran.should == true
   end
 
@@ -198,6 +193,7 @@ describe Warbler::Task do
     define_tasks "webxml", "exploded", "java_classes", "gems"
     Rake::Task['warble:exploded'].invoke
     File.exist?("web.xml").should == true
+    File.exist?("sun-web.xml").should == true
     File.symlink?("gems").should == true
     File.symlink?("public/WEB-INF").should == true
     Rake::Task['warble:clean:exploded'].invoke
@@ -227,12 +223,11 @@ describe Warbler::Task do
   end
 
   it "should be able to exclude files from the .war" do
-    @config.dirs << "spec"
-    @config.excludes += FileList['spec/spec_helper.rb']
+    @config.excludes += FileList['lib/tasks/utils.rake']
     task "warble:gems" do; end
     define_tasks "app"
     Rake::Task["warble:app"].invoke
-    file_list(%r{spec/spec_helper.rb}).should be_empty
+    file_list(%r{lib/tasks/utils.rake}).should be_empty
   end
 
   it "should be able to define all tasks successfully" do
@@ -310,6 +305,25 @@ describe Warbler::Task do
     rails
   end
 
+  def mock_merb_module
+    merb = Module.new
+    Object.const_set("Merb", merb)
+    boot_loader = Module.new
+    merb.const_set("BootLoader", boot_loader)
+    merb.const_set("VERSION", "1.0")
+    dependencies = Class.new do
+      @@dependencies = []
+      def self.dependencies
+        @@dependencies
+      end
+      def self.dependencies=(deps)
+        @@dependencies = deps
+      end
+    end
+    boot_loader.const_set("Dependencies", dependencies)
+    dependencies
+  end
+
   it "should auto-detect a Rails application" do
     task :environment do
       mock_rails_module
@@ -326,7 +340,7 @@ describe Warbler::Task do
     end
 
     config = Warbler::Config.new
-    config.gems.should include("rails")
+    config.gems.should have_key("rails")
 
     mkdir_p "vendor/rails"
     config = Warbler::Config.new
@@ -338,15 +352,26 @@ describe Warbler::Task do
     config.gems.should be_empty
   end
 
+  it "should not try to autodetect frameworks when Warbler.framework_detection is false" do
+    begin
+      Warbler.framework_detection = false
+      task :environment
+      config = Warbler::Config.new
+      config.webxml.booter.should_not == :rails
+      t = Rake::Task['environment']
+      class << t; public :instance_variable_get; end
+      t.instance_variable_get("@already_invoked").should == false
+    ensure
+      Warbler.framework_detection = true
+    end
+  end
+
   it "should auto-detect a Merb application" do
     task :merb_env do
-      merb = Module.new
-      Object.const_set("Merb", merb)
-      merb.const_set("VERSION", "0.9.3")
+      mock_merb_module
     end
     @config = Warbler::Config.new
     @config.webxml.booter.should == :merb
-    @config.gems["merb"].should == "0.9.3"
     @config.gems.keys.should_not include("rails")
   end
 
@@ -365,13 +390,41 @@ describe Warbler::Task do
       rails.stub!(:configuration).and_return(config)
       gem = mock "gem"
       gem.stub!(:name).and_return "hpricot"
-      gem.stub!(:version).and_return "=0.6"
+      gem.stub!(:requirement).and_return Gem::Requirement.new("=0.6")
       config.stub!(:gems).and_return [gem]
     end
 
     @config = Warbler::Config.new
     @config.webxml.booter.should == :rails
-    @config.gems["hpricot"].should == "=0.6"
+    @config.gems.keys.should include(Gem::Dependency.new("hpricot", Gem::Requirement.new("=0.6")))
+  end
+
+  it "should automatically add Merb::BootLoader::Dependencies.dependencies to the list of gems" do
+    task :merb_env do
+      deps = mock_merb_module
+      deps.dependencies = [Gem::Dependency.new("merb-core", ">= 1.0.6.1")]
+    end
+    @config = Warbler::Config.new
+    @config.webxml.booter.should == :merb
+    @config.gems.keys.should include(Gem::Dependency.new("merb-core", ">= 1.0.6.1"))
+  end
+
+  it "should skip Merb development dependencies" do
+    task :merb_env do
+      deps = mock_merb_module
+      deps.dependencies = [Gem::Dependency.new("rake", "= #{RAKEVERSION}", :development)]
+    end
+    @config = Warbler::Config.new
+    define_tasks "copy_gems"
+    Rake.application.lookup("gem:rake-#{RAKEVERSION}").should be_nil
+  end
+
+  it "should warn about using Merb < 1.0" do
+    task :merb_env do
+      Object.const_set("Merb", Module.new)
+    end
+    @config = Warbler::Config.new
+    @config.webxml.booter.should == :merb
   end
 
   it "should set the jruby max runtimes to 1 when MT Rails is detected" do

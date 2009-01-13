@@ -59,6 +59,10 @@ module Warbler
     # the Rails application
     attr_accessor :war_name
 
+    # Name of the MANIFEST.MF template.  Defaults to the MANIFEST.MF normally generated
+    # by jar -cf....
+    attr_accessor :manifest_file
+
     # Extra configuration for web.xml. Controls how the dynamically-generated web.xml
     # file is generated.
     #
@@ -143,12 +147,12 @@ module Warbler
     end
 
     def auto_detect_frameworks
-      auto_detect_rails || auto_detect_merb || auto_detect_rackup
+      !Warbler.framework_detection || auto_detect_rails || auto_detect_merb || auto_detect_rackup
     end
 
     def auto_detect_rails
       return false unless task = Warbler.project_application.lookup("environment")
-      task.invoke
+      task.invoke rescue nil
       return false unless defined?(::Rails)
       @dirs << "tmp" if File.directory?("tmp")
       @webxml.booter = :rails
@@ -156,7 +160,7 @@ module Warbler
         @gems["rails"] = Rails::VERSION::STRING
       end
       if defined?(Rails.configuration.gems)
-        Rails.configuration.gems.each {|g| @gems[g.name] = g.version }
+        Rails.configuration.gems.each {|g| @gems << Gem::Dependency.new(g.name, g.requirement) }
       end
       @webxml.jruby.max.runtimes = 1 if defined?(Rails.configuration.threadsafe!)
       true
@@ -164,10 +168,14 @@ module Warbler
 
     def auto_detect_merb
       return false unless task = Warbler.project_application.lookup("merb_env")
-      task.invoke
+      task.invoke rescue nil
       return false unless defined?(::Merb)
       @webxml.booter = :merb
-      @gems["merb"] = Merb::VERSION
+      if defined?(Merb::BootLoader::Dependencies.dependencies)
+        Merb::BootLoader::Dependencies.dependencies.each {|g| @gems << g }
+      else
+        warn "unable to auto-detect Merb dependencies; upgrade to Merb 1.0 or greater"
+      end
       true
     end
 

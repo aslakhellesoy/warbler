@@ -13,9 +13,12 @@ module Warbler
     def project_application
       @project_application || Rake.application
     end
-  end
 
-  # Warbler Rake task.  Allows defining multiple configurations inside the same 
+    attr_accessor :framework_detection
+  end
+  self.framework_detection = true
+
+  # Warbler Rake task.  Allows defining multiple configurations inside the same
   # Rakefile by using different task names.
   class Task < Rake::TaskLib
     COPY_PROC = proc {|t| cp t.prerequisites.last, t.name }
@@ -88,7 +91,7 @@ module Warbler
 
     def define_gems_task
       directory "#{config.staging_dir}/#{apply_pathmaps("sources-0.0.1.gem", :gems).pathmap("%d")}"
-      targets = define_copy_gems_tasks
+      targets = define_copy_gems_task
       with_namespace_and_config do
         desc "Unpack all gems into WEB-INF/gems"
         task "gems" => targets
@@ -114,7 +117,7 @@ module Warbler
             end
             require 'erb'
             erb = ERB.new(File.open(erb) {|f| f.read })
-            File.open("#{config.staging_dir}/WEB-INF/web.xml", "w") do |f| 
+            File.open("#{config.staging_dir}/WEB-INF/web.xml", "w") do |f|
               f << erb.result(erb_binding(config.webxml))
             end
           end
@@ -172,7 +175,8 @@ module Warbler
         task "jar" do
           war_path = "#{config.war_name}.war"
           war_path = File.join(config.autodeploy_dir, war_path) if config.autodeploy_dir
-          sh "jar cf #{war_path} -C #{config.staging_dir} ."
+          flags, manifest = config.manifest_file ? ["cfm", config.manifest_file] : ["cf", ""]
+          sh "jar #{flags} #{war_path} #{manifest} -C #{config.staging_dir} ."
         end
       end
     end
@@ -183,6 +187,7 @@ module Warbler
         desc "Create an exploded war in the app's public directory"
         task "exploded" => ["webxml", "java_classes", "gems", *libs] do
           cp "#{@config.staging_dir}/WEB-INF/web.xml", "."
+          cp File.join(WARBLER_HOME, "sun-web.xml"), "." unless File.exists?("sun-web.xml")
           ln_sf "#{@config.staging_dir}/WEB-INF/gems", "."
           if File.directory?("#{@config.staging_dir}/WEB-INF/classes")
             ln_sf "#{@config.staging_dir}/WEB-INF/classes", "."
@@ -197,7 +202,7 @@ module Warbler
             ["gems", "public/WEB-INF", "classes"]).each do |l|
             rm_f l if File.exist?(l) && File.symlink?(l)
           end
-          rm_f "web.xml"
+          rm_f "*web.xml"
         end
       end
     end
@@ -264,7 +269,7 @@ module Warbler
       end
     end
 
-    def define_copy_gems_tasks
+    def define_copy_gems_task
       targets = []
       @config.gems.each do |gem, version|
         define_single_gem_tasks(gem, targets, version)
@@ -277,12 +282,16 @@ module Warbler
       when Gem::Dependency
         gem_pattern
       else
-        Gem::Dependency.new(gem_pattern, version)
+        Gem::Dependency.new(gem_pattern, Gem::Requirement.create(version))
       end
+
+      # skip development dependencies
+      return if gem.respond_to?(:type) and gem.type != :runtime
+
       matched = Gem.source_index.search(gem)
       fail "gem '#{gem}' not installed" if matched.empty?
       spec = matched.last
-      
+
       gem_name = "#{spec.name}-#{spec.version}"
       unless spec.platform.nil? || spec.platform == Gem::Platform::RUBY
         [spec.platform, spec.original_platform].each do |p|
@@ -314,7 +323,7 @@ module Warbler
 
       if @config.gem_dependencies
         spec.dependencies.each do |dep|
-          define_single_gem_tasks(dep.name, targets, dep.version_requirements)
+          define_single_gem_tasks(dep, targets)
         end
       end
     end
