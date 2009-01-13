@@ -121,9 +121,9 @@ module Warbler
     
     def jruby_jar
       jruby_home   = ENV["JRUBY_HOME"]
-      libdir       = jruby_home ? File.join(jruby_home, 'lib') : Config::CONFIG['libdir']
+      libdir       = jruby_home ? File.join(jruby_home, 'lib') : ::Config::CONFIG['libdir']
       jruby_jar    = File.join(libdir, 'jruby.jar')
-      raise "#{jruby_jar} does not exist" unless File.file?(jruby_jar)
+      raise "#{jruby_jar} does not exist. Define JRUBY_HOME or run with JRuby." unless File.file?(jruby_jar)
       jruby_jar
     end
     
