@@ -9,6 +9,10 @@ Warbler::Config.new do |config|
   # Application directories to be included in the webapp.
   config.dirs = %w(app config lib log vendor tmp)
 
+  # Sets the jruby_complete.jar to package with the war. Defaults
+  # to jruby_complete.jar inside your JRuby installation.
+  # config.jruby_complete_jar = path/to/jruby_complete.jar
+
   # Additional files/directories to include, above those in config.dirs
   # config.includes = FileList["db"]
 
