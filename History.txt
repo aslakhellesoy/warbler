@@ -1,3 +1,7 @@
+== 0.9.13 (In Git)
+
+* Ability to set jruby_complete.jar in config/warbler.rb (Aslak Hellesøy)
+
 == 0.9.12
 
 * Allow framework auto-detection to be disabled. Set
