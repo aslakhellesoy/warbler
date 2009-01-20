@@ -17,6 +17,10 @@ module Warbler
     # Directory where files will be staged, defaults to tmp/war
     attr_accessor :staging_dir
 
+    # The jruby-complete.jar to package with the war. Defaults to
+    # jruby-complete.jar inside current JRuby if it exists.
+    attr_accessor :jruby_complete_jar
+
     # Directory where the war file will be written. Can be used to direct
     # Warbler to place your war file directly in your application server's
     # autodeploy directory. Defaults to the root of the Rails directory.
@@ -96,7 +100,8 @@ module Warbler
       @dirs        = TOP_DIRS.select {|d| File.directory?(d)}
       @includes    = FileList[]
       @excludes    = FileList[]
-      @java_libs   = FileList[jruby_jar,"#{warbler_home}/lib/*.jar"]
+      @java_libs   = FileList[]
+      @jruby_complete_jar = default_jruby_complete_jar
       @java_classes = FileList[]
       @gems        = Warbler::Gems.new
       @gem_dependencies = true
@@ -108,6 +113,17 @@ module Warbler
       @war_name    = File.basename(@rails_root)
       auto_detect_frameworks
       yield self if block_given?
+
+      if @jruby_complete_jar.nil?
+      raise %{
+Couldn't find a valid jruby_complete.jar. Please do one of the following:
+
+* Set config.jruby_complete_jar in your config/warble.rb
+* Download a jruby-complete.jar and put it in your JRuby's lib dir (without version number)
+* If you are running warble with a non-JRuby interpreter - set JRUBY_HOME
+      }
+      end
+      @java_libs += FileList[@jruby_complete_jar,"#{warbler_home}/lib/*.jar"]
       @excludes += warbler_vendor_excludes(warbler_home)
       @excludes += FileList["**/*.log"] if @exclude_logs
       @excludes << @staging_dir
@@ -119,12 +135,11 @@ module Warbler
 
     private
     
-    def jruby_jar
+    def default_jruby_complete_jar
       jruby_home   = ENV["JRUBY_HOME"]
       libdir       = jruby_home ? File.join(jruby_home, 'lib') : ::Config::CONFIG['libdir']
-      jruby_jar    = File.join(libdir, 'jruby.jar')
-      raise "#{jruby_jar} does not exist. Define JRUBY_HOME or run with JRuby." unless File.file?(jruby_jar)
-      jruby_jar
+      jruby_jar    = File.join(libdir, "jruby-complete.jar")
+      File.file?(jruby_jar) ? jruby_jar : nil
     end
     
     def warbler_vendor_excludes(warbler_home)
