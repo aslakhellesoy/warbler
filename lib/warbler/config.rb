@@ -114,9 +114,11 @@ module Warbler
       auto_detect_frameworks
       yield self if block_given?
 
-      if @jruby_complete_jar.nil?
+      unless File.file?(@jruby_complete_jar)
+      
       raise %{
-Couldn't find a valid jruby_complete.jar. Please do one of the following:
+Couldn't find #{@jruby_complete_jar} 
+Please do one of the following:
 
 * Set config.jruby_complete_jar in your config/warble.rb
 * Download a jruby-complete.jar and put it in your JRuby's lib dir (without version number)
@@ -139,7 +141,6 @@ Couldn't find a valid jruby_complete.jar. Please do one of the following:
       jruby_home   = ENV["JRUBY_HOME"]
       libdir       = jruby_home ? File.join(jruby_home, 'lib') : ::Config::CONFIG['libdir']
       jruby_jar    = File.join(libdir, "jruby-complete.jar")
-      File.file?(jruby_jar) ? jruby_jar : nil
     end
     
     def warbler_vendor_excludes(warbler_home)
